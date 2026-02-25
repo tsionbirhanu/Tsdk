@@ -1,0 +1,64 @@
+node_modules/
+.next/
+dist/
+build/
+*.log
+*.tsbuildinfo
+.env
+# Node dependencies
+node_modules/
+
+# Next.js build output
+/.next/
+/out/
+
+# Production builds
+/build/
+/dist/
+
+# Local environment files
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+.env.*.local
+
+# Logs
+npm-debug.log*
+pnpm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+*.log
+
+# Editor directories and files
+.vscode/
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# TypeScript
+*.tsbuildinfo
+
+# Test coverage
+/coverage/
+/.nyc_output/
+
+# Caches
+/.cache/
+.parcel-cache/
+.turbo/
+
+# Vercel, Netlify, and similar
+/.vercel/
+/.netlify/
+
+# Misc
+/debug/
+node_modules

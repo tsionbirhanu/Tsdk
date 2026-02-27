@@ -10,6 +10,7 @@ import HeroSection from "@/components/HeroSection";
 import OfferingsSection from "@/components/OfferingsSection";
 import HowItWorksSection from "@/components/HowItWorksSection";
 import Footer from "@/components/Footer";
+import ParchmentOverlay from "@/components/ui/ParchmentOverlay";
 
 export default function Home() {
   return (
@@ -23,9 +24,8 @@ export default function Home() {
         priority
         className="object-cover -z-20"
       />
-
       {/* Warm parchment overlay */}
-      <div className="absolute inset-0 bg-gradient-to-b from-[#f3e3cf]/80 via-[#f3e3cf]/50 to-[#f3e3cf]/80 -z-10" />
+      <ParchmentOverlay />
 
       {/* Header */}
       <Navbar />

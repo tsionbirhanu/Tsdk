@@ -13,8 +13,7 @@ const HeroSection = () => {
         <div
           className="relative w-36 h-36 rounded-full overflow-hidden 
                           border-[1px] border-[#8b5829]/30 bg-[#6d4620] p-4 
-                          flex-shrink-0 mt-2"
-        >
+                          flex-shrink-0 mt-2">
           <Image
             src="/logo.png"
             alt="TSEDQ Logo"
@@ -30,8 +29,7 @@ const HeroSection = () => {
             initial={{ opacity: 0, y: 40 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.8, delay: 0.2 }}
-            className="font-['Jomolhari'] text-6xl lg:text-7xl font-bold tracking-wide leading-tight"
-          >
+            className="font-['Jomolhari'] text-6xl lg:text-7xl font-bold tracking-wide leading-tight">
             WELCOME TO TSEDQ
           </motion.h1>
 
@@ -39,8 +37,7 @@ const HeroSection = () => {
             initial={{ opacity: 0, y: 40 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.8, delay: 0.45 }}
-            className="mt-5 text-xl lg:text-2xl font-semibold leading-relaxed max-w-2xl"
-          >
+            className="mt-5 text-xl lg:text-2xl font-semibold leading-relaxed max-w-2xl">
             Empowering Orthodox Communities <br />
             Through Digitalized Faith Giving & Finance
           </motion.h2>
@@ -49,10 +46,9 @@ const HeroSection = () => {
             initial={{ opacity: 0, y: 40 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.8, delay: 0.7 }}
-            className="mt-6 text-base lg:text-lg text-[#4b2e18] leading-relaxed max-w-2xl"
-          >
-            TSEDQ is a FaithTech platform that unifies donations, tithing,
-            and community contributions using smart automation, blockchain
+            className="mt-6 text-base lg:text-lg text-[#4b2e18] leading-relaxed max-w-2xl">
+            TSEDQ is a FaithTech platform that unifies donations, tithing, and
+            community contributions using smart automation, blockchain
             transparency, and secure digital payments.
           </motion.p>
 
@@ -61,9 +57,8 @@ const HeroSection = () => {
             initial={{ opacity: 0, y: 30 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.7, delay: 0.9 }}
-            className="mt-8 flex flex-col sm:flex-row gap-4"
-          >
-            <Link href="/register">
+            className="mt-8 flex flex-col sm:flex-row gap-4">
+            <Link href="/auth/register">
               <Button className="bg-[#8b5829] hover:bg-[#6d4620] text-white px-8 py-3 rounded-full shadow-md w-full sm:w-auto">
                 Get Started
               </Button>
@@ -71,8 +66,7 @@ const HeroSection = () => {
             <Link href="#how-it-works">
               <Button
                 variant="outline"
-                className="bg-white/80 text-[#3b2411] border border-[#d8c7aa] hover:bg-[#fdf7ec] px-8 py-3 rounded-full w-full sm:w-auto"
-              >
+                className="bg-white/80 text-[#3b2411] border border-[#d8c7aa] hover:bg-[#fdf7ec] px-8 py-3 rounded-full w-full sm:w-auto">
                 Learn More
               </Button>
             </Link>
@@ -85,8 +79,7 @@ const HeroSection = () => {
         initial={{ opacity: 0, scale: 0.9 }}
         animate={{ opacity: 1, scale: 1 }}
         transition={{ duration: 1, delay: 0.3, ease: "easeOut" }}
-        className="hidden lg:flex justify-end items-center pointer-events-none"
-      >
+        className="hidden lg:flex justify-end items-center pointer-events-none">
         <div className="relative w-[320px] h-[680px]">
           <Image
             src="/2714933a256bdceb53779dcfd80f9ea1f839ed95.png"
@@ -102,4 +95,3 @@ const HeroSection = () => {
 };
 
 export default HeroSection;
-

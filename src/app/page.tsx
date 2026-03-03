@@ -1,21 +1,31 @@
 "use client";
 
 import React from "react";
-import Image from "next/image";
-
-// components
-import CTASection from "@/components/CTASection";
+import Link from "next/link";
+import { Button } from "@/components/ui/button";
+import {
+  Heart,
+  Calendar,
+  Handshake,
+  Coins,
+  Users,
+  TrendingUp,
+} from "lucide-react";
 import Navbar from "@/components/Navbar";
 import HeroSection from "@/components/HeroSection";
+import ParchmentOverlay from "@/components/ui/ParchmentOverlay";
+import CampaignCard from "@/components/CampaignCard";
+import { mockCampaigns } from "@/lib/mock-data";
+import { cn } from "@/lib/utils";
+import Image from "next/image";
 import OfferingsSection from "@/components/OfferingsSection";
 import HowItWorksSection from "@/components/HowItWorksSection";
 import Footer from "@/components/Footer";
-import ParchmentOverlay from "@/components/ui/ParchmentOverlay";
 
-export default function Home() {
+const LandingPage: React.FC = () => {
+
   return (
     <div className="relative w-full min-h-screen overflow-hidden text-[#3b2411]">
-      
       {/* Background */}
       <Image
         src="/image.jpg"
@@ -27,7 +37,7 @@ export default function Home() {
       {/* Warm parchment overlay */}
       <ParchmentOverlay />
 
-      {/* Header */}
+      {/* Navbar */}
       <Navbar />
 
       {/* Hero Section */}
@@ -39,12 +49,10 @@ export default function Home() {
       {/* How it works section */}
       <HowItWorksSection />
 
-      {/* CTA */}
-      <CTASection />
-
       {/* Footer */}
       <Footer />
-
     </div>
   );
-}
+};
+
+export default LandingPage;

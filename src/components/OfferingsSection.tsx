@@ -5,16 +5,6 @@ import { Button } from "@/components/ui/button";
 
 const offerings = [
   {
-    title: "Selet (Vows)",
-    desc: "Create and track sacred vows with flexible installments and friendly reminders easily.",
-    img: "/IMAGE1.jpg",
-  },
-  {
-    title: "Gbir (Annual Contribution)",
-    desc: "Manage yearly community gifts with clear status updates and payment history.",
-    img: "/IMAGE2.png",
-  },
-  {
     title: "Donations",
     desc: "Every gift, large or small, helps preserve sacred traditions; join parish generosity.",
     img: "/IMAGE3.png",
@@ -24,6 +14,17 @@ const offerings = [
     desc: "Enter your income and TSEDQ calculates your faithful 10% tithe automatically.",
     img: "/IMAGE4.png",
   },
+  {
+    title: "Selet (Vows)",
+    desc: "Create and track sacred vows with flexible installments and friendly reminders easily.",
+    img: "/IMAGE1.jpg",
+  },
+  {
+    title: "Gbir (Annual Contribution)",
+    desc: "Manage yearly community gifts with clear status updates and payment history.",
+    img: "/IMAGE2.png",
+  },
+  
 ];
 
 const OfferingsSection = () => (

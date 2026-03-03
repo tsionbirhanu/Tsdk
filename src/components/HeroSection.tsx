@@ -58,7 +58,7 @@ const HeroSection = () => {
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.7, delay: 0.9 }}
             className="mt-8 flex flex-col sm:flex-row gap-4">
-            <Link href="/auth/signup">
+            <Link href="/auth/register">
               <Button className="bg-[#8b5829] hover:bg-[#6d4620] text-white px-8 py-3 rounded-full shadow-md w-full sm:w-auto">
                 Get Started
               </Button>

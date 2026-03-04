@@ -7,7 +7,7 @@ export type AuthenticatedHandler = (
   req: NextRequest,
   user: AuthUser,
   userProfile: User,
-  params?: Record<string, string>
+  params?: Record<string, string>,
 ) => Promise<NextResponse>;
 
 type UserRole = User["role"];
@@ -85,6 +85,10 @@ export function withAuth(
           status: 401,
         });
       }
+
+      console.log("ALLOWED ROLES:", allowedRoles);
+      console.log("USER PROFILE ROLE:", userProfile?.role);
+      console.log("USER PROFILE:", userProfile);
 
       // Check if user's role is allowed
       if (allowedRoles && allowedRoles.length > 0) {

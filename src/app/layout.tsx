@@ -1,6 +1,6 @@
 import { Playfair_Display, DM_Sans, DM_Mono } from "next/font/google";
 import "./globals.css";
-import AuthProvider from "@/contexts/AuthContext";
+import { AuthProvider } from "@/lib/api/auth-context";
 
 const playfairDisplay = Playfair_Display({
   weight: ["400", "700"],
@@ -35,7 +35,9 @@ export default function RootLayout({
     <html
       lang="en"
       className={`${playfairDisplay.variable} ${dmSans.variable} ${dmMono.variable}`}>
-      <body className={`${dmSans.className} antialiased`}>
+      <body
+        className={`${dmSans.className} antialiased`}
+        suppressHydrationWarning={true}>
         <AuthProvider>{children}</AuthProvider>
       </body>
     </html>

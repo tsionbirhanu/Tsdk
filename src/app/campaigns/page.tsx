@@ -1,46 +1,110 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { Search, Filter, ChevronDown } from "lucide-react";
 import Sidebar from "@/components/Sidebar";
 import PageHeader from "@/components/PageHeader";
 import CampaignCard from "@/components/CampaignCard";
-import { mockCampaigns, mockChurches } from "@/lib/mock-data";
 import { cn } from "@/lib/utils";
+import { campaigns, churches, Campaign, Church } from "@/lib/api/client";
 
 const CampaignsPage: React.FC = () => {
-  const [activeFilter, setActiveFilter] = useState<"all" | "active" | "closed">(
-    "all",
-  );
-  const [selectedChurch, setSelectedChurch] = useState<string>("");
-  const [searchQuery, setSearchQuery] = useState("");
+  const [allCampaigns, setAllCampaigns] = useState<Campaign[]>([]);
+  const [churchesList, setChurchesList] = useState<Church[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  const filteredCampaigns = mockCampaigns.filter((campaign) => {
-    const matchesStatus =
-      activeFilter === "all" || campaign.status === activeFilter;
-    const matchesChurch = !selectedChurch || campaign.church === selectedChurch;
-    const matchesSearch =
-      !searchQuery ||
-      campaign.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      campaign.church.toLowerCase().includes(searchQuery.toLowerCase());
+  const [statusFilter, setStatusFilter] = useState<
+    "all" | "active" | "closed" | "paused"
+  >("all");
+  const [churchFilter, setChurchFilter] = useState<string>("all");
+  const [search, setSearch] = useState("");
 
-    return matchesStatus && matchesChurch && matchesSearch;
-  });
+  useEffect(() => {
+    setIsLoading(true);
+    setError(null);
+    Promise.allSettled([campaigns.list(), churches.list()])
+      .then(([campaignsResult, churchesResult]) => {
+        if (campaignsResult.status === "fulfilled") {
+          setAllCampaigns(campaignsResult.value);
+        } else {
+          setError(
+            campaignsResult.reason?.message || "Failed to load campaigns",
+          );
+        }
+        if (churchesResult.status === "fulfilled") {
+          setChurchesList(churchesResult.value);
+        } else {
+          setError(churchesResult.reason?.message || "Failed to load churches");
+        }
+      })
+      .catch((err) => {
+        setError(err.message || "Failed to load data");
+      })
+      .finally(() => setIsLoading(false));
+  }, []);
+
+  // Filter logic
+  const filteredCampaigns = allCampaigns
+    .filter((c) => statusFilter === "all" || c.status === statusFilter)
+    .filter((c) => churchFilter === "all" || c.church_id === churchFilter)
+    .filter((c) => c.title.toLowerCase().includes(search.toLowerCase()));
 
   const filterTabs = [
-    { key: "all", label: "All", count: mockCampaigns.length },
+    { key: "all", label: "All", count: allCampaigns.length },
     {
       key: "active",
       label: "Active",
-      count: mockCampaigns.filter((c) => c.status === "active").length,
+      count: allCampaigns.filter((c) => c.status === "active").length,
     },
     {
       key: "closed",
       label: "Closed",
-      count: mockCampaigns.filter((c) => c.status === "closed").length,
+      count: allCampaigns.filter((c) => c.status === "closed").length,
+    },
+    {
+      key: "paused",
+      label: "Paused",
+      count: allCampaigns.filter((c) => c.status === "paused").length,
     },
   ];
 
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-[var(--color-surface)] flex">
+        <Sidebar />
+        <main className="flex-1 ml-72 p-8">
+          <PageHeader
+            title="Campaigns"
+            subtitle="Support causes that matter to your community"
+          />
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 mt-8">
+            {[...Array(6)].map((_, i) => (
+              <div
+                key={i}
+                className="bg-white rounded-lg shadow-warm border border-[var(--color-border)] p-6 animate-pulse h-64"
+              />
+            ))}
+          </div>
+        </main>
+      </div>
+    );
+  }
+  if (error) {
+    return (
+      <div className="min-h-screen bg-[var(--color-surface)] flex">
+        <Sidebar />
+        <main className="flex-1 ml-72 p-8 flex items-center justify-center">
+          <div className="text-center">
+            <h1 className="font-display text-2xl font-semibold text-[var(--color-text)] mb-4">
+              Error
+            </h1>
+            <p className="text-[var(--color-text-muted)]">{error}</p>
+          </div>
+        </main>
+      </div>
+    );
+  }
   return (
     <div className="min-h-screen bg-[var(--color-surface)] flex">
       <Sidebar />
@@ -59,10 +123,10 @@ const CampaignsPage: React.FC = () => {
               {filterTabs.map((tab) => (
                 <button
                   key={tab.key}
-                  onClick={() => setActiveFilter(tab.key as any)}
+                  onClick={() => setStatusFilter(tab.key as any)}
                   className={cn(
                     "px-4 py-2 rounded-md text-sm font-body font-medium transition-colors",
-                    activeFilter === tab.key
+                    statusFilter === tab.key
                       ? "bg-white text-[var(--color-primary)] shadow-sm"
                       : "text-[var(--color-text-muted)] hover:text-[var(--color-text)]",
                   )}>
@@ -74,12 +138,12 @@ const CampaignsPage: React.FC = () => {
             {/* Church Filter */}
             <div className="relative">
               <select
-                value={selectedChurch}
-                onChange={(e) => setSelectedChurch(e.target.value)}
+                value={churchFilter}
+                onChange={(e) => setChurchFilter(e.target.value)}
                 className="px-4 py-2 pr-10 rounded-lg border border-[var(--color-border)] bg-white font-body text-sm appearance-none focus:outline-none focus:ring-2 focus:ring-[var(--color-accent)] focus:border-transparent">
-                <option value="">All Churches</option>
-                {mockChurches.map((church) => (
-                  <option key={church.id} value={church.name}>
+                <option value="all">All Churches</option>
+                {churchesList.map((church) => (
+                  <option key={church.id} value={church.id}>
                     {church.name}
                   </option>
                 ))}
@@ -93,8 +157,8 @@ const CampaignsPage: React.FC = () => {
               <input
                 type="text"
                 placeholder="Search campaigns..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
                 className="w-full pl-10 pr-4 py-2 rounded-lg border border-[var(--color-border)] bg-white font-body text-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-accent)] focus:border-transparent"
               />
             </div>
@@ -136,9 +200,9 @@ const CampaignsPage: React.FC = () => {
             </p>
             <button
               onClick={() => {
-                setActiveFilter("all");
-                setSelectedChurch("");
-                setSearchQuery("");
+                setStatusFilter("all");
+                setChurchFilter("all");
+                setSearch("");
               }}
               className="text-[var(--color-primary)] hover:underline font-body font-medium">
               Clear all filters

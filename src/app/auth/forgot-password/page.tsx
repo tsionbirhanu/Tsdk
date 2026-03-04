@@ -4,12 +4,14 @@ import Image from "next/image";
 import Link from "next/link";
 import { useState } from "react";
 import { motion } from "framer-motion";
+import { auth, ApiError } from "@/lib/api/client";
 
 export default function ForgotPasswordPage() {
   const [email, setEmail] = useState("");
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
+  const [submitted, setSubmitted] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -18,26 +20,16 @@ export default function ForgotPasswordPage() {
     setLoading(true);
 
     try {
-      const res = await fetch("/api/auth/forgot-password", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email }),
-      });
-
-      const data = await res.json();
-
-      if (!res.ok) {
-        setError(data?.error || "Request failed");
-        setLoading(false);
-        return;
-      }
-
-      setMessage(
-        "If an account exists for this email, a reset link has been sent.",
-      );
-      setLoading(false);
+      await auth.forgotPassword({ email });
+      setMessage("If this email exists you will receive a reset link shortly.");
+      setSubmitted(true);
     } catch (err: any) {
-      setError(err?.message || "An unexpected error occurred");
+      if (err instanceof ApiError) {
+        setError(err.message);
+      } else {
+        setError("Request failed. Please try again.");
+      }
+    } finally {
       setLoading(false);
     }
   };
@@ -87,36 +79,50 @@ export default function ForgotPasswordPage() {
           Forgot Password
         </h2>
         <p className="text-center text-base text-[#6b4a2a] mb-6">
-          Enter your email to receive a reset link.
+          {submitted
+            ? "Check your email for reset instructions."
+            : "Enter your email to receive a reset link."}
         </p>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="space-y-1.5">
-            <label className="block text-base font-semibold text-[#3b2411]">
-              Email
-            </label>
-            <div className="rounded-xl bg-white px-4 py-3 shadow-[0_6px_18px_rgba(0,0,0,0.12)] border border-black/10">
-              <input
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                required
-                placeholder="you@example.com"
-                className="w-full bg-white text-[#2f1c0d] text-base font-medium outline-none border-0 focus:ring-0 placeholder:text-[#7a5a3a]/60"
-              />
+        {!submitted ? (
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div className="space-y-1.5">
+              <label className="block text-base font-semibold text-[#3b2411]">
+                Email
+              </label>
+              <div className="rounded-xl bg-white px-4 py-3 shadow-[0_6px_18px_rgba(0,0,0,0.12)] border border-black/10">
+                <input
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  disabled={loading}
+                  required
+                  placeholder="you@example.com"
+                  className="w-full bg-white text-[#2f1c0d] text-base font-medium outline-none border-0 focus:ring-0 placeholder:text-[#7a5a3a]/60 disabled:opacity-50"
+                />
+              </div>
             </div>
+
+            {error && <p className="text-xs text-red-600 -mt-1">{error}</p>}
+
+            <button
+              type="submit"
+              disabled={loading}
+              className="w-full py-2.5 rounded-lg text-base font-semibold text-[#5a3a1a] border border-[#8b7252] bg-white/30 hover:bg-white/50 active:bg-white/60 transition shadow-sm disabled:opacity-50 mb-2">
+              {loading ? "Sending..." : "Send reset link"}
+            </button>
+          </form>
+        ) : (
+          <div className="text-center space-y-4">
+            {message && (
+              <div className="bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-lg text-sm">
+                {message}
+              </div>
+            )}
           </div>
+        )}
 
-          {error && <p className="text-xs text-red-600 -mt-1">{error}</p>}
-          {message && <p className="text-xs text-green-700 -mt-1">{message}</p>}
-
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full py-2.5 rounded-lg text-base font-semibold text-[#5a3a1a] border border-[#8b7252] bg-white/30 hover:bg-white/50 active:bg-white/60 transition shadow-sm disabled:opacity-50 mb-2">
-            {loading ? "Sending..." : "Send reset link"}
-          </button>
-
+        <div className="mt-6">
           <p className="text-center text-base font-semibold text-[#3b2411]">
             Remembered your password?{" "}
             <Link
@@ -125,7 +131,7 @@ export default function ForgotPasswordPage() {
               Back to Login
             </Link>
           </p>
-        </form>
+        </div>
       </motion.div>
     </div>
   );

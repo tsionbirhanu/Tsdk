@@ -5,9 +5,12 @@ import Link from "next/link";
 import { useState } from "react";
 import { motion } from "framer-motion";
 import { useRouter } from "next/navigation";
+import { useAuth } from "@/lib/api/auth-context";
+import { ApiError } from "@/lib/api/client";
 
 export default function LoginPage() {
   const router = useRouter();
+  const { login } = useAuth();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -22,35 +25,15 @@ export default function LoginPage() {
     setLoading(true);
 
     try {
-      const res = await fetch("/api/auth/login", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password }),
-      });
-
-      const data = await res.json();
-
-      if (!res.ok) {
-        setError(data?.error || "Login failed");
-        setLoading(false);
-        return;
-      }
-
-      if (data?.data?.session) {
-        const session = data.data.session;
-        localStorage.setItem("access_token", session.access_token || "");
-        if (session.refresh_token) {
-          localStorage.setItem("refresh_token", session.refresh_token);
-        }
-        if (session.user) {
-          localStorage.setItem("user", JSON.stringify(session.user));
-        }
-      }
-
-      setLoading(false);
-      router.push("/");
+      await login(email, password);
+      router.push("/dashboard");
     } catch (err: any) {
-      setError(err?.message || "An unexpected error occurred");
+      if (err instanceof ApiError) {
+        setError(err.message);
+      } else {
+        setError("Login failed. Please try again.");
+      }
+    } finally {
       setLoading(false);
     }
   };
@@ -59,7 +42,7 @@ export default function LoginPage() {
     <div className="relative min-h-screen w-full flex items-center justify-center overflow-hidden text-base">
       {/* Background image */}
       <Image
-        src="/auth-background.png"
+        src="/images/image1.jpg"
         alt="Background"
         fill
         priority
@@ -80,22 +63,19 @@ export default function LoginPage() {
             "linear-gradient(180deg, rgba(255,255,255,0.18) 0%, rgba(245,232,215,0.20) 40%, rgba(230,210,185,0.22) 70%, rgba(220,200,175,0.24) 100%)",
           backdropFilter: "blur(20px)",
           WebkitBackdropFilter: "blur(20px)",
-        }}
-      >
+        }}>
         {/* Avatar */}
         <motion.div
           className="absolute -top-11 left-1/2 -translate-x-1/2"
           initial={{ opacity: 0, y: -10 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.7, delay: 0.15 }}
-        >
+          transition={{ duration: 0.7, delay: 0.15 }}>
           <div className="w-[78px] h-[78px] rounded-full bg-gradient-to-b from-[#c9a478] to-[#8b6840] flex items-center justify-center shadow-lg border-[3px] border-white/40">
             <svg
               xmlns="http://www.w3.org/2000/svg"
               className="w-10 h-10 text-white/90"
               viewBox="0 0 24 24"
-              fill="currentColor"
-            >
+              fill="currentColor">
               <path d="M12 12c2.7 0 4.8-2.1 4.8-4.8S14.7 2.4 12 2.4 7.2 4.5 7.2 7.2 9.3 12 12 12zm0 2.4c-3.2 0-9.6 1.6-9.6 4.8v1.2c0 .66.54 1.2 1.2 1.2h16.8c.66 0 1.2-.54 1.2-1.2v-1.2c0-3.2-6.4-4.8-9.6-4.8z" />
             </svg>
           </div>
@@ -110,93 +90,97 @@ export default function LoginPage() {
         </p>
 
         <form onSubmit={handleSubmit} className="space-y-4">
-        {/* Email */}
-<div className="space-y-1.5">
-  <label className="block text-base font-semibold text-[#3b2411]">
-    Email
-  </label>
-  <div className="rounded-xl bg-white px-4 py-3 shadow-[0_6px_18px_rgba(0,0,0,0.12)] border border-black/10">
-    <input
-      type="email"
-      value={email}
-      onChange={(e) => setEmail(e.target.value)}
-      required
-      placeholder="you@example.com"
-      className="w-full bg-white text-[#2f1c0d] text-base font-medium outline-none border-0 focus:outline-none focus:ring-0 placeholder:text-[#7a5a3a]/60"
-    />
-  </div>
-</div>
+          {/* Email */}
+          <div className="space-y-1.5">
+            <label className="block text-base font-semibold text-[#3b2411]">
+              Email
+            </label>
+            <div className="rounded-xl bg-white px-4 py-3 shadow-[0_6px_18px_rgba(0,0,0,0.12)] border border-black/10">
+              <input
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                disabled={loading}
+                required
+                placeholder="you@example.com"
+                className="w-full bg-white text-[#2f1c0d] text-base font-medium outline-none border-0 focus:outline-none focus:ring-0 placeholder:text-[#7a5a3a]/60 disabled:opacity-50"
+              />
+            </div>
+          </div>
 
-{/* Password */}
-<div className="space-y-1.5">
-  <label className="block text-base font-semibold text-[#3b2411]">
-    Password
-  </label>
-  <div className="flex items-center gap-2 rounded-xl bg-white px-4 py-3 shadow-[0_6px_18px_rgba(0,0,0,0.12)] border border-black/10">
-    <input
-      type={showPassword ? "text" : "password"}
-      value={password}
-      onChange={(e) => setPassword(e.target.value)}
-      required
-      placeholder="••••••••"
-      className="flex-1 bg-white text-[#2f1c0d] text-base font-medium outline-none border-0 focus:outline-none focus:ring-0 placeholder:text-[#7a5a3a]/60"
-    />
+          {/* Password */}
+          <div className="space-y-1.5">
+            <label className="block text-base font-semibold text-[#3b2411]">
+              Password
+            </label>
+            <div className="flex items-center gap-2 rounded-xl bg-white px-4 py-3 shadow-[0_6px_18px_rgba(0,0,0,0.12)] border border-black/10">
+              <input
+                type={showPassword ? "text" : "password"}
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                disabled={loading}
+                required
+                placeholder="••••••••"
+                className="flex-1 bg-white text-[#2f1c0d] text-base font-medium outline-none border-0 focus:outline-none focus:ring-0 placeholder:text-[#7a5a3a]/60 disabled:opacity-50"
+              />
 
-    <button
-      type="button"
-      onClick={togglePassword}
-      className="text-[#4a2e14]/70 hover:text-[#4a2e14] focus:outline-none"
-      aria-label={showPassword ? "Hide password" : "Show password"}
-    >
-      {showPassword ? (
-        <svg
-          xmlns="http://www.w3.org/2000/svg"
-          className="h-4 w-4"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="1.8"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        >
-          <path d="M17.94 17.94A10.94 10.94 0 0 1 12 20c-5 0-9.27-3.11-11-8a10.94 10.94 0 0 1 3.06-4.94" />
-          <path d="M14.12 14.12A3 3 0 0 1 9.88 9.88" />
-          <path d="M1 1l22 22" />
-        </svg>
-      ) : (
-        <svg
-          xmlns="http://www.w3.org/2000/svg"
-          className="h-4 w-4"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="1.8"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        >
-          <path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7S1 12 1 12z" />
-          <circle cx="12" cy="12" r="3" />
-        </svg>
-      )}
-    </button>
-  </div>
-</div>
+              <button
+                type="button"
+                onClick={togglePassword}
+                className="text-[#4a2e14]/70 hover:text-[#4a2e14] focus:outline-none"
+                aria-label={showPassword ? "Hide password" : "Show password"}>
+                {showPassword ? (
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    className="h-4 w-4"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.8"
+                    strokeLinecap="round"
+                    strokeLinejoin="round">
+                    <path d="M17.94 17.94A10.94 10.94 0 0 1 12 20c-5 0-9.27-3.11-11-8a10.94 10.94 0 0 1 3.06-4.94" />
+                    <path d="M14.12 14.12A3 3 0 0 1 9.88 9.88" />
+                    <path d="M1 1l22 22" />
+                  </svg>
+                ) : (
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    className="h-4 w-4"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.8"
+                    strokeLinecap="round"
+                    strokeLinejoin="round">
+                    <path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7S1 12 1 12z" />
+                    <circle cx="12" cy="12" r="3" />
+                  </svg>
+                )}
+              </button>
+            </div>
+          </div>
           {/* Forgot password */}
           <div className="text-right">
             <Link
               href="/auth/forgot-password"
-              className="text-base font-semibold text-[#4a2e14] hover:text-[#2b190b] italic"
-            >
+              className="text-base font-semibold text-[#4a2e14] hover:text-[#2b190b] italic">
               Forgot password?
             </Link>
           </div>
+
+          {/* Error message */}
+          {error && (
+            <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm">
+              {error}
+            </div>
+          )}
 
           {/* Login button */}
           <button
             type="submit"
             disabled={loading}
-            className="w-full py-2.5 rounded-lg text-base font-semibold text-[#5a3a1a] border border-[#8b7252] bg_white/30 bg-white/30 hover:bg-white/50 active:bg-white/60 transition shadow-sm disabled:opacity-50 mb-4"
-          >
+            className="w-full py-2.5 rounded-lg text-base font-semibold text-[#5a3a1a] border border-[#8b7252] bg_white/30 bg-white/30 hover:bg-white/50 active:bg-white/60 transition shadow-sm disabled:opacity-50 mb-4">
             {loading ? "Logging in..." : "Login"}
           </button>
 
@@ -205,8 +189,7 @@ export default function LoginPage() {
             Don&apos;t have an account?{" "}
             <Link
               href="/auth/register"
-              className="font-extrabold text-[#4a2a0a] underline underline-offset-2 hover:text-[#2a1600]"
-            >
+              className="font-extrabold text-[#4a2a0a] underline underline-offset-2 hover:text-[#2a1600]">
               Register
             </Link>
           </p>
@@ -215,4 +198,3 @@ export default function LoginPage() {
     </div>
   );
 }
-

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   Plus,
   TrendingUp,
@@ -11,57 +11,40 @@ import Sidebar from "@/components/Sidebar";
 import PageHeader from "@/components/PageHeader";
 import { Button } from "@/components/ui/button";
 import StatusBadge from "@/components/StatusBadge";
-import { getCurrentUser, getUserAseratEntries } from "@/lib/mock-data";
+import { aserat, AseratRecord } from "@/lib/api/client";
+import { useAuth } from "@/lib/api/auth-context";
 
 const AseratPage: React.FC = () => {
-  const currentUser = getCurrentUser();
-  const aseratEntries = getUserAseratEntries(currentUser.id);
+  const { user } = useAuth();
+  const [records, setRecords] = useState<AseratRecord[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(false);
+
+  // Payment state
+  const [payingRecord, setPayingRecord] = useState<string | null>(null);
+  const [payAmount, setPayAmount] = useState("");
+  const [payError, setPayError] = useState<string | null>(null);
+
+  // Form state
   const [formData, setFormData] = useState({
     month: new Date().getMonth() + 1,
     year: new Date().getFullYear(),
-    income: "",
+    incomeAmount: "",
   });
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [formError, setFormError] = useState<string | null>(null);
+  const [formSuccess, setFormSuccess] = useState<string | null>(null);
 
-  const currentMonthEntry = aseratEntries.find(
-    (entry) =>
-      entry.month === new Date().getMonth() + 1 &&
-      entry.year === new Date().getFullYear(),
-  );
+  useEffect(() => {
+    aserat
+      .list()
+      .then((data) => setRecords(data))
+      .catch((err) => setError(err.message))
+      .finally(() => setIsLoading(false));
+  }, []);
 
-  const dueAmount = formData.income
-    ? Math.round(parseInt(formData.income) * 0.1)
-    : 0;
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (formData.income) {
-      alert(
-        `Income entry saved! Due amount: ETB ${dueAmount.toLocaleString()}`,
-      );
-      setShowForm(false);
-      setFormData({
-        month: new Date().getMonth() + 1,
-        year: new Date().getFullYear(),
-        income: "",
-      });
-    }
-  };
-
-  const getStatusVariant = (status: string) => {
-    switch (status) {
-      case "paid":
-        return "paid";
-      case "partial":
-        return "partial";
-      case "missed":
-        return "missed";
-      default:
-        return "pending";
-    }
-  };
-
-  const monthNames = [
+  const MONTHS = [
     "January",
     "February",
     "March",
@@ -76,11 +59,139 @@ const AseratPage: React.FC = () => {
     "December",
   ];
 
-  // Mock chart data for the trend
-  const chartData = aseratEntries.slice(-6).map((entry) => ({
-    month: monthNames[entry.month - 1],
-    paid: entry.paidAmount,
-  }));
+  const currentMonth = new Date().getMonth() + 1;
+  const currentYear = new Date().getFullYear();
+  const currentRecord = records.find(
+    (r) => r.month === currentMonth && r.year === currentYear,
+  );
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const incomeAmount = Number(formData.incomeAmount);
+
+    if (incomeAmount <= 0) {
+      setFormError("Please enter a valid income amount");
+      return;
+    }
+
+    setIsSubmitting(true);
+    setFormError(null);
+    setFormSuccess(null);
+
+    try {
+      const record = await aserat.create({
+        month: Number(formData.month),
+        year: Number(formData.year),
+        income_amount: incomeAmount,
+      });
+
+      // Update records state
+      const existingIndex = records.findIndex(
+        (r) => r.month === record.month && r.year === record.year,
+      );
+
+      if (existingIndex >= 0) {
+        setRecords((prev) => [
+          ...prev.slice(0, existingIndex),
+          record,
+          ...prev.slice(existingIndex + 1),
+        ]);
+      } else {
+        setRecords((prev) => [record, ...prev]);
+      }
+
+      setFormSuccess("Aserat entry saved!");
+      setFormData({
+        month: new Date().getMonth() + 1,
+        year: new Date().getFullYear(),
+        incomeAmount: "",
+      });
+    } catch (err: any) {
+      setFormError(err.message || "Failed to save entry");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handlePayment = async (recordId: string, amount: number) => {
+    setPayError(null);
+    try {
+      const updated = await aserat.pay(recordId, amount);
+      setRecords((prev) => prev.map((r) => (r.id === recordId ? updated : r)));
+      setPayingRecord(null);
+      setPayAmount("");
+    } catch (err: any) {
+      setPayError(err.message || "Payment failed");
+    }
+  };
+
+  const dueAmount = formData.incomeAmount
+    ? Math.round(Number(formData.incomeAmount) * 0.1)
+    : 0;
+
+  const getStatusVariant = (status: string) => {
+    switch (status) {
+      case "paid":
+        return "paid";
+      case "partial":
+        return "partial";
+      case "missed":
+        return "missed";
+      default:
+        return "pending";
+    }
+  };
+
+  const getStatusText = (status: string) => {
+    switch (status) {
+      case "paid":
+        return "Paid ✓";
+      case "partial":
+        return "Partial";
+      case "missed":
+        return "Missed";
+      default:
+        return "Pending";
+    }
+  };
+
+  // Loading state
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-[var(--color-surface)] flex">
+        <Sidebar />
+        <main className="flex-1 ml-72 p-8">
+          <div className="flex items-center justify-center min-h-96">
+            <div className="text-center">
+              <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-[var(--color-primary)] mx-auto mb-4"></div>
+              <p className="text-[var(--color-text-muted)]">
+                Loading Aserat records...
+              </p>
+            </div>
+          </div>
+        </main>
+      </div>
+    );
+  }
+
+  // Error state
+  if (error) {
+    return (
+      <div className="min-h-screen bg-[var(--color-surface)] flex">
+        <Sidebar />
+        <main className="flex-1 ml-72 p-8">
+          <div className="flex items-center justify-center min-h-96">
+            <div className="text-center">
+              <div className="text-red-500 text-lg font-semibold mb-2">
+                Error loading Aserat records
+              </div>
+              <p className="text-[var(--color-text-muted)]">{error}</p>
+            </div>
+          </div>
+        </main>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-[var(--color-surface)] flex">
@@ -102,7 +213,7 @@ const AseratPage: React.FC = () => {
         <div className="bg-white rounded-lg shadow-warm border border-[var(--color-border)] p-8 mb-8">
           <div className="text-center mb-6">
             <h2 className="font-display text-2xl font-semibold text-[var(--color-text)] mb-2">
-              {monthNames[new Date().getMonth()]} {new Date().getFullYear()}
+              {MONTHS[new Date().getMonth()]} {new Date().getFullYear()}
             </h2>
             <div className="inline-flex items-center px-4 py-2 rounded-full bg-[var(--color-surface-2)]">
               <CalendarIcon className="w-4 h-4 mr-2 text-[var(--color-text-muted)]" />
@@ -112,40 +223,116 @@ const AseratPage: React.FC = () => {
             </div>
           </div>
 
-          {currentMonthEntry ? (
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-6 text-center">
-              <div>
-                <div className="font-mono text-2xl font-bold text-[var(--color-text)] mb-1">
-                  ETB {currentMonthEntry.income.toLocaleString()}
+          {currentRecord ? (
+            <div>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6 text-center mb-6">
+                <div>
+                  <div className="font-mono text-2xl font-bold text-[var(--color-accent)] mb-1">
+                    ETB {currentRecord.amount_due.toLocaleString()}
+                  </div>
+                  <div className="text-sm text-[var(--color-text-muted)]">
+                    Due (10%)
+                  </div>
                 </div>
-                <div className="text-sm text-[var(--color-text-muted)]">
-                  Income Reported
+                <div>
+                  <div className="font-mono text-2xl font-bold text-[var(--color-primary)] mb-1">
+                    ETB {currentRecord.amount_paid.toLocaleString()}
+                  </div>
+                  <div className="text-sm text-[var(--color-text-muted)]">
+                    Amount Paid
+                  </div>
+                </div>
+                <div>
+                  <StatusBadge
+                    variant={getStatusVariant(currentRecord.status)}
+                    className="text-base px-4 py-2">
+                    {getStatusText(currentRecord.status)}
+                  </StatusBadge>
                 </div>
               </div>
-              <div>
-                <div className="font-mono text-2xl font-bold text-[var(--color-accent)] mb-1">
-                  ETB {currentMonthEntry.dueAmount.toLocaleString()}
+
+              {/* Progress Bar */}
+              {currentRecord.amount_due > 0 && (
+                <div className="mb-4">
+                  <div className="w-full bg-[var(--color-surface)] rounded-full h-3">
+                    <div
+                      className="bg-[var(--color-primary)] h-3 rounded-full"
+                      style={{
+                        width: `${Math.min((currentRecord.amount_paid / currentRecord.amount_due) * 100, 100)}%`,
+                      }}
+                    />
+                  </div>
+                  <div className="flex justify-between text-sm text-[var(--color-text-muted)] mt-2">
+                    <span>Progress</span>
+                    <span>
+                      {Math.round(
+                        (currentRecord.amount_paid / currentRecord.amount_due) *
+                          100,
+                      )}
+                      %
+                    </span>
+                  </div>
                 </div>
-                <div className="text-sm text-[var(--color-text-muted)]">
-                  Due (10%)
+              )}
+
+              {/* Pay Button */}
+              {currentRecord.status !== "paid" && (
+                <div className="text-center">
+                  <Button
+                    onClick={() => setPayingRecord(currentRecord.id)}
+                    className="mr-2">
+                    Pay Now
+                  </Button>
                 </div>
-              </div>
-              <div>
-                <div className="font-mono text-2xl font-bold text-[var(--color-primary)] mb-1">
-                  ETB {currentMonthEntry.paidAmount.toLocaleString()}
+              )}
+
+              {/* Inline Payment Form */}
+              {payingRecord === currentRecord.id && (
+                <div className="mt-4 p-4 bg-[var(--color-surface)] rounded-lg">
+                  <div className="flex gap-3 flex-wrap items-end">
+                    <div className="flex-1 min-w-40">
+                      <label className="block text-sm font-medium text-[var(--color-text)] mb-2">
+                        Amount to pay (max: ETB{" "}
+                        {(
+                          currentRecord.amount_due - currentRecord.amount_paid
+                        ).toLocaleString()}
+                        )
+                      </label>
+                      <input
+                        type="number"
+                        value={payAmount}
+                        onChange={(e) => setPayAmount(e.target.value)}
+                        max={
+                          currentRecord.amount_due - currentRecord.amount_paid
+                        }
+                        placeholder="Amount to pay"
+                        className="w-full px-3 py-2 rounded-lg border border-[var(--color-border)] focus:outline-none focus:ring-2 focus:ring-[var(--color-accent)]"
+                      />
+                    </div>
+                    <Button
+                      onClick={() =>
+                        handlePayment(currentRecord.id, Number(payAmount))
+                      }
+                      disabled={!payAmount || Number(payAmount) <= 0}
+                      size="sm">
+                      Pay
+                    </Button>
+                    <Button
+                      variant="outline"
+                      onClick={() => {
+                        setPayingRecord(null);
+                        setPayAmount("");
+                        setPayError(null);
+                      }}
+                      size="sm">
+                      Cancel
+                    </Button>
+                  </div>
+                  {payError && (
+                    <p className="text-sm text-red-500 mt-2">{payError}</p>
+                  )}
                 </div>
-                <div className="text-sm text-[var(--color-text-muted)]">
-                  Amount Paid
-                </div>
-              </div>
-              <div>
-                <StatusBadge
-                  variant={getStatusVariant(currentMonthEntry.status)}
-                  className="text-base px-4 py-2">
-                  {currentMonthEntry.status.charAt(0).toUpperCase() +
-                    currentMonthEntry.status.slice(1)}
-                </StatusBadge>
-              </div>
+              )}
             </div>
           ) : (
             <div className="text-center py-8">
@@ -153,10 +340,10 @@ const AseratPage: React.FC = () => {
                 <CalendarIcon className="w-8 h-8 text-[var(--color-primary)] opacity-50" />
               </div>
               <h3 className="font-display text-lg font-semibold text-[var(--color-text)] mb-2">
-                No income reported for this month
+                No Aserat entry for this month yet
               </h3>
               <p className="text-[var(--color-text-muted)] mb-4">
-                Add your monthly income to calculate your tithe.
+                Add one below to track your tithe.
               </p>
               <Button onClick={() => setShowForm(true)}>
                 Add Income Entry
@@ -172,6 +359,19 @@ const AseratPage: React.FC = () => {
               <h3 className="font-display text-xl font-semibold text-[var(--color-text)] mb-4">
                 Add Income Entry
               </h3>
+
+              {formSuccess && (
+                <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded-lg">
+                  <p className="text-sm text-green-600">{formSuccess}</p>
+                </div>
+              )}
+
+              {formError && (
+                <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg">
+                  <p className="text-sm text-red-600">{formError}</p>
+                </div>
+              )}
+
               <form onSubmit={handleSubmit} className="space-y-4">
                 <div className="grid grid-cols-2 gap-4">
                   <div>
@@ -188,7 +388,7 @@ const AseratPage: React.FC = () => {
                           })
                         }
                         className="w-full px-4 py-3 pr-10 rounded-lg border border-[var(--color-border)] bg-white font-body appearance-none focus:outline-none focus:ring-2 focus:ring-[var(--color-accent)] focus:border-transparent">
-                        {monthNames.map((month, index) => (
+                        {MONTHS.map((month, index) => (
                           <option key={index} value={index + 1}>
                             {month}
                           </option>
@@ -211,7 +411,10 @@ const AseratPage: React.FC = () => {
                           })
                         }
                         className="w-full px-4 py-3 pr-10 rounded-lg border border-[var(--color-border)] bg-white font-body appearance-none focus:outline-none focus:ring-2 focus:ring-[var(--color-accent)] focus:border-transparent">
-                        {[2024, 2023, 2022, 2021].map((year) => (
+                        {Array.from(
+                          { length: currentYear - 2020 + 2 },
+                          (_, i) => 2020 + i,
+                        ).map((year) => (
                           <option key={year} value={year}>
                             {year}
                           </option>
@@ -228,9 +431,9 @@ const AseratPage: React.FC = () => {
                   </label>
                   <input
                     type="number"
-                    value={formData.income}
+                    value={formData.incomeAmount}
                     onChange={(e) =>
-                      setFormData({ ...formData, income: e.target.value })
+                      setFormData({ ...formData, incomeAmount: e.target.value })
                     }
                     className="w-full px-4 py-3 rounded-lg border border-[var(--color-border)] bg-white font-body focus:outline-none focus:ring-2 focus:ring-[var(--color-accent)] focus:border-transparent"
                     placeholder="Enter your monthly income"
@@ -238,20 +441,28 @@ const AseratPage: React.FC = () => {
                   />
                   {dueAmount > 0 && (
                     <p className="mt-2 text-sm text-[var(--color-accent)] font-medium">
-                      10% due: ETB {dueAmount.toLocaleString()}
+                      Your Aserat due: ETB {dueAmount.toLocaleString()}
                     </p>
                   )}
                 </div>
 
                 <div className="flex gap-3">
-                  <Button type="submit" className="flex-1">
-                    Save Entry
+                  <Button
+                    type="submit"
+                    className="flex-1"
+                    disabled={isSubmitting}>
+                    {isSubmitting ? "Saving..." : "Save Entry"}
                   </Button>
                   <Button
                     type="button"
                     variant="outline"
-                    onClick={() => setShowForm(false)}
-                    className="flex-1">
+                    onClick={() => {
+                      setShowForm(false);
+                      setFormError(null);
+                      setFormSuccess(null);
+                    }}
+                    className="flex-1"
+                    disabled={isSubmitting}>
                     Cancel
                   </Button>
                 </div>
@@ -292,7 +503,7 @@ const AseratPage: React.FC = () => {
                     Month
                   </th>
                   <th className="text-left py-3 px-4 font-body font-semibold text-[var(--color-text)]">
-                    Income
+                    Year
                   </th>
                   <th className="text-left py-3 px-4 font-body font-semibold text-[var(--color-text)]">
                     Due
@@ -301,35 +512,126 @@ const AseratPage: React.FC = () => {
                     Paid
                   </th>
                   <th className="text-left py-3 px-4 font-body font-semibold text-[var(--color-text)]">
+                    Remaining
+                  </th>
+                  <th className="text-left py-3 px-4 font-body font-semibold text-[var(--color-text)]">
                     Status
+                  </th>
+                  <th className="text-left py-3 px-4 font-body font-semibold text-[var(--color-text)]">
+                    Action
                   </th>
                 </tr>
               </thead>
               <tbody>
-                {aseratEntries.map((entry) => (
-                  <tr
-                    key={entry.id}
-                    className="border-b border-[var(--color-surface)] last:border-0">
-                    <td className="py-4 px-4 font-body">
-                      {monthNames[entry.month - 1]} {entry.year}
-                    </td>
-                    <td className="py-4 px-4 font-mono font-semibold">
-                      ETB {entry.income.toLocaleString()}
-                    </td>
-                    <td className="py-4 px-4 font-mono font-semibold text-[var(--color-accent)]">
-                      ETB {entry.dueAmount.toLocaleString()}
-                    </td>
-                    <td className="py-4 px-4 font-mono font-semibold">
-                      ETB {entry.paidAmount.toLocaleString()}
-                    </td>
-                    <td className="py-4 px-4">
-                      <StatusBadge variant={getStatusVariant(entry.status)}>
-                        {entry.status.charAt(0).toUpperCase() +
-                          entry.status.slice(1)}
-                      </StatusBadge>
+                {records
+                  .sort((a, b) => {
+                    if (a.year !== b.year) return b.year - a.year;
+                    return b.month - a.month;
+                  })
+                  .map((record) => (
+                    <>
+                      <tr
+                        key={record.id}
+                        className="border-b border-[var(--color-surface)] last:border-0">
+                        <td className="py-4 px-4 font-body">
+                          {MONTHS[record.month - 1]}
+                        </td>
+                        <td className="py-4 px-4 font-body">{record.year}</td>
+                        <td className="py-4 px-4 font-mono font-semibold text-[var(--color-accent)]">
+                          ETB {record.amount_due.toLocaleString()}
+                        </td>
+                        <td className="py-4 px-4 font-mono font-semibold">
+                          ETB {record.amount_paid.toLocaleString()}
+                        </td>
+                        <td className="py-4 px-4 font-mono font-semibold">
+                          ETB{" "}
+                          {(
+                            record.amount_due - record.amount_paid
+                          ).toLocaleString()}
+                        </td>
+                        <td className="py-4 px-4">
+                          <StatusBadge
+                            variant={getStatusVariant(record.status)}>
+                            {getStatusText(record.status)}
+                          </StatusBadge>
+                        </td>
+                        <td className="py-4 px-4">
+                          {record.status !== "paid" && (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() =>
+                                setPayingRecord(
+                                  payingRecord === record.id ? null : record.id,
+                                )
+                              }>
+                              {payingRecord === record.id ? "Cancel" : "Pay"}
+                            </Button>
+                          )}
+                        </td>
+                      </tr>
+
+                      {/* Inline payment row */}
+                      {payingRecord === record.id && (
+                        <tr className="bg-[var(--color-surface)]">
+                          <td colSpan={7} className="py-4 px-4">
+                            <div className="flex gap-3 items-end">
+                              <div className="flex-1">
+                                <label className="block text-sm font-medium text-[var(--color-text)] mb-2">
+                                  Amount to pay (max: ETB{" "}
+                                  {(
+                                    record.amount_due - record.amount_paid
+                                  ).toLocaleString()}
+                                  )
+                                </label>
+                                <input
+                                  type="number"
+                                  value={payAmount}
+                                  onChange={(e) => setPayAmount(e.target.value)}
+                                  max={record.amount_due - record.amount_paid}
+                                  placeholder="Amount to pay"
+                                  className="w-full px-3 py-2 rounded-lg border border-[var(--color-border)] focus:outline-none focus:ring-2 focus:ring-[var(--color-accent)]"
+                                />
+                              </div>
+                              <Button
+                                onClick={() =>
+                                  handlePayment(record.id, Number(payAmount))
+                                }
+                                disabled={!payAmount || Number(payAmount) <= 0}
+                                size="sm">
+                                Confirm Payment
+                              </Button>
+                              <Button
+                                variant="outline"
+                                onClick={() => {
+                                  setPayingRecord(null);
+                                  setPayAmount("");
+                                  setPayError(null);
+                                }}
+                                size="sm">
+                                Cancel
+                              </Button>
+                            </div>
+                            {payError && (
+                              <p className="text-sm text-red-500 mt-2">
+                                {payError}
+                              </p>
+                            )}
+                          </td>
+                        </tr>
+                      )}
+                    </>
+                  ))}
+
+                {records.length === 0 && (
+                  <tr>
+                    <td
+                      colSpan={7}
+                      className="py-8 text-center text-[var(--color-text-muted)]">
+                      No Aserat records found. Add your first entry above.
                     </td>
                   </tr>
-                ))}
+                )}
               </tbody>
             </table>
           </div>

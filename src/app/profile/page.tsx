@@ -1,25 +1,65 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Upload, ChevronDown, Save } from "lucide-react";
 import Sidebar from "@/components/Sidebar";
 import PageHeader from "@/components/PageHeader";
 import { Button } from "@/components/ui/button";
 import StatusBadge from "@/components/StatusBadge";
-import { getCurrentUser, mockChurches } from "@/lib/mock-data";
+import { useAuth } from "@/lib/api/auth-context";
+import { users, churches, media } from "@/lib/api/client";
+import type { User, Church } from "@/lib/api/client";
 
 const ProfilePage: React.FC = () => {
-  const currentUser = getCurrentUser();
+  const { user } = useAuth();
+  const [userProfile, setUserProfile] = useState<User | null>(null);
+  const [churchList, setChurchList] = useState<Church[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
+  
   const [formData, setFormData] = useState({
-    fullName: currentUser.name,
-    phone: currentUser.phone || "",
-    email: currentUser.email,
-    homeChurch: currentUser.homeChurch,
-    language: currentUser.language,
-    voiceEnabled: currentUser.voiceEnabled,
+    fullName: "",
+    phone: "",
+    email: "",
+    homeChurch: "",
+    language: "en",
+    voiceEnabled: false,
   });
 
   const [hasChanges, setHasChanges] = useState(false);
+
+  useEffect(() => {
+    const initData = async () => {
+      try {
+        const [userData, churchData] = await Promise.all([
+          users.me(),
+          churches.list()
+        ]);
+        
+        setUserProfile(userData);
+        setChurchList(churchData);
+        
+        // Initialize form data
+        setFormData({
+          fullName: userData.full_name,
+          phone: userData.phone || "",
+          email: user?.email || "",
+          homeChurch: userData.church_id || "",
+          language: userData.preferred_language || "en",
+          voiceEnabled: userData.voice_enabled,
+        });
+      } catch (error) {
+        console.error("Failed to load profile data:", error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    
+    if (user) {
+      initData();
+    }
+  }, [user]);
 
   const handleChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>,
@@ -35,31 +75,80 @@ const ProfilePage: React.FC = () => {
     setFormData((prev) => {
       const updated = { ...prev, [name]: newValue };
       setHasChanges(
-        JSON.stringify(updated) !==
+        userProfile && JSON.stringify(updated) !==
           JSON.stringify({
-            fullName: currentUser.name,
-            phone: currentUser.phone || "",
-            email: currentUser.email,
-            homeChurch: currentUser.homeChurch,
-            language: currentUser.language,
-            voiceEnabled: currentUser.voiceEnabled,
-          }),
+            fullName: userProfile.full_name,
+            phone: userProfile.phone || "",
+            email: user?.email || "",
+            homeChurch: userProfile.church_id || "",
+            language: userProfile.preferred_language || "en",
+            voiceEnabled: userProfile.voice_enabled,
+          })
       );
       return updated;
     });
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    alert("Profile updated successfully!");
-    setHasChanges(false);
+    if (!userProfile) return;
+    
+    setIsSaving(true);
+    try {
+      const updateData = {
+        full_name: formData.fullName,
+        phone: formData.phone || null,
+        church_id: formData.homeChurch || null,
+        preferred_language: formData.language as "en" | "am" | "or",
+        voice_enabled: formData.voiceEnabled,
+      };
+      
+      const updatedUser = await users.updateMe(updateData);
+      setUserProfile(updatedUser);
+      setHasChanges(false);
+      
+      // Success message could be shown via toast in production
+      console.log("Profile updated successfully!");
+    } catch (error) {
+      console.error("Failed to update profile:", error);
+    } finally {
+      setIsSaving(false);
+    }
   };
 
-  const handleUploadPhoto = () => {
-    alert("Photo upload coming soon!");
+  const handleUploadPhoto = async () => {
+    const input = document.createElement("input");
+    input.type = "file";
+    input.accept = "image/*";
+    input.onchange = async (event) => {
+      const file = (event.target as HTMLInputElement).files?.[0];
+      if (!file) return;
+      
+      setIsUploading(true);
+      try {
+        const mediaResult = await media.upload(file, "tsedk-profiles");
+        
+        // Update user profile with new media ID
+        const updatedUser = await users.updateMe({
+          profile_media_id: mediaResult.id
+        });
+        
+        setUserProfile(updatedUser);
+        console.log("Profile photo updated successfully!");
+      } catch (error) {
+        console.error("Failed to upload photo:", error);
+      } finally {
+        setIsUploading(false);
+      }
+    };
+    input.click();
   };
 
-  const languages = ["English", "Amharic"];
+  const languages = [
+    { code: "en", name: "English" },
+    { code: "am", name: "Amharic" },
+    { code: "or", name: "Oromo" }
+  ];
 
   return (
     <div className="min-h-screen bg-[var(--color-surface)] flex">

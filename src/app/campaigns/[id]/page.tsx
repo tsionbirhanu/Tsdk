@@ -14,13 +14,16 @@ import {
   Campaign,
   Church,
 } from "@/lib/api/client";
+import { useAuth } from "@/lib/api/auth-context";
 
 const CampaignDetailPage: React.FC = () => {
   const params = useParams();
   const campaignId = params.id as string;
+  const { user } = useAuth();
+
   type RecentDonor = {
     id: string;
-    userName?: string;
+    userName: string;
     amount: number;
     date: string;
     anonymous: boolean;
@@ -64,7 +67,8 @@ const CampaignDetailPage: React.FC = () => {
           setError(churchesResult.reason?.message || "Failed to load churches");
         }
         if (donationsResult.status === "fulfilled") {
-          const mappedRecentDonors = donationsResult.value
+          // Filter to only show current user's donations for this campaign
+          const myDonationsForCampaign = donationsResult.value
             .filter((donation) => donation.campaign_id === campaignId)
             .sort(
               (a, b) =>
@@ -75,20 +79,20 @@ const CampaignDetailPage: React.FC = () => {
             .map((donation) => ({
               id: donation.id,
               userName: donation.is_anonymous
-                ? undefined
-                : `Donor ${donation.user_id.slice(0, 6)}`,
+                ? "Anonymous Donor"
+                : user?.full_name || "Donor",
               amount: donation.amount,
               date: donation.created_at,
               anonymous: donation.is_anonymous,
             }));
-          setRecentDonors(mappedRecentDonors);
+          setRecentDonors(myDonationsForCampaign);
         }
       })
       .catch((err) => {
         setError(err.message || "Failed to load data");
       })
       .finally(() => setIsLoading(false));
-  }, [campaignId]);
+  }, [campaignId, user]);
 
   if (isLoading) {
     return (
@@ -253,7 +257,9 @@ const CampaignDetailPage: React.FC = () => {
                   <div className="flex items-center justify-between text-[var(--color-text-muted)] mb-6">
                     <div className="flex items-center gap-2">
                       <Users className="w-5 h-5" />
-                      <span>{donorCount} donors</span>
+                      <span>
+                        {donorCount} donor{donorCount !== 1 ? "s" : ""}
+                      </span>
                     </div>
                     <div className="flex items-center gap-2">
                       <Calendar className="w-5 h-5" />
@@ -278,36 +284,40 @@ const CampaignDetailPage: React.FC = () => {
                   Recent Donors
                 </h2>
                 <div className="space-y-3">
-                  {recentDonors.map((donation) => (
-                    <div
-                      key={donation.id}
-                      className="flex items-center justify-between py-2">
-                      <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-full bg-[var(--color-primary)] text-white flex items-center justify-center font-display font-semibold">
-                          {donation.anonymous
-                            ? "👤"
-                            : donation.userName
-                                ?.split(" ")
-                                .map((n: string) => n[0])
-                                .join("")
-                                .toUpperCase()}
-                        </div>
-                        <div>
-                          <p className="font-body font-medium text-[var(--color-text)]">
+                  {recentDonors.length > 0 ? (
+                    recentDonors.map((donation) => (
+                      <div
+                        key={donation.id}
+                        className="flex items-center justify-between py-2">
+                        <div className="flex items-center gap-3">
+                          <div className="w-10 h-10 rounded-full bg-[var(--color-primary)] text-white flex items-center justify-center font-display font-semibold">
                             {donation.anonymous
-                              ? "Anonymous Donor"
-                              : donation.userName}
-                          </p>
-                          <p className="text-xs text-[var(--color-text-muted)]">
-                            {new Date(donation.date).toLocaleDateString()}
-                          </p>
+                              ? "👤"
+                              : donation.userName
+                                  .split(" ")
+                                  .map((n: string) => n[0])
+                                  .join("")
+                                  .toUpperCase()}
+                          </div>
+                          <div>
+                            <p className="font-body font-medium text-[var(--color-text)]">
+                              {donation.userName}
+                            </p>
+                            <p className="text-xs text-[var(--color-text-muted)]">
+                              {new Date(donation.date).toLocaleDateString()}
+                            </p>
+                          </div>
                         </div>
+                        <span className="font-mono font-semibold text-[var(--color-text)]">
+                          ETB {donation.amount.toLocaleString()}
+                        </span>
                       </div>
-                      <span className="font-mono font-semibold text-[var(--color-text)]">
-                        ETB {donation.amount.toLocaleString()}
-                      </span>
-                    </div>
-                  ))}
+                    ))
+                  ) : (
+                    <p className="text-[var(--color-text-muted)] text-center py-8">
+                      No donations yet. Be the first to donate!
+                    </p>
+                  )}
                 </div>
               </div>
             </div>
@@ -434,8 +444,9 @@ const CampaignDetailPage: React.FC = () => {
                 )}
                 {success && (
                   <p className="text-sm text-green-600 text-center mb-2">
-                    Thank you for your donation! Your contribution has been
-                    recorded.
+                    {donateAnonymously
+                      ? `Thank you for your anonymous donation of ETB ${selectedAmount || parseInt(customAmount) || 0}!`
+                      : `Thank you ${user?.full_name || ""} for your donation of ETB ${selectedAmount || parseInt(customAmount) || 0}!`}
                   </p>
                 )}
 

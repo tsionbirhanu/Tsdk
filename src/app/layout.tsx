@@ -35,7 +35,9 @@ export default function RootLayout({
     <html
       lang="en"
       className={`${playfairDisplay.variable} ${dmSans.variable} ${dmMono.variable}`}>
-      <body className={`${dmSans.className} antialiased`}>
+      <body
+        className={`${dmSans.className} antialiased`}
+        suppressHydrationWarning={true}>
         <AuthProvider>{children}</AuthProvider>
       </body>
     </html>

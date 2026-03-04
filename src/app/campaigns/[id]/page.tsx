@@ -1,27 +1,125 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import { Calendar, Users, Share2, Heart } from "lucide-react";
 import Sidebar from "@/components/Sidebar";
 import { Button } from "@/components/ui/button";
 import ProgressBar from "@/components/ProgressBar";
 import StatusBadge from "@/components/StatusBadge";
-import { getCampaignById, getRecentDonors } from "@/lib/mock-data";
+import {
+  campaigns,
+  churches,
+  donations,
+  Campaign,
+  Church,
+} from "@/lib/api/client";
 
 const CampaignDetailPage: React.FC = () => {
   const params = useParams();
   const campaignId = params.id as string;
-  const campaign = getCampaignById(campaignId);
-  const recentDonors = getRecentDonors(campaignId);
+  type RecentDonor = {
+    id: string;
+    userName?: string;
+    amount: number;
+    date: string;
+    anonymous: boolean;
+  };
 
+  // State declarations
+  const [campaign, setCampaign] = useState<Campaign | null>(null);
+  const [churchList, setChurchList] = useState<Church[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  // Donation form state
   const [selectedAmount, setSelectedAmount] = useState<number | null>(null);
   const [customAmount, setCustomAmount] = useState("");
   const [paymentMethod, setPaymentMethod] = useState<
-    "Telebirr" | "CBE Birr" | "Cash"
-  >("Telebirr");
+    "telebirr" | "cbe_birr" | "cash" | "other"
+  >("telebirr");
   const [donateAnonymously, setDonateAnonymously] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [donationError, setDonationError] = useState<string | null>(null);
+  const [success, setSuccess] = useState(false);
+  const [recentDonors, setRecentDonors] = useState<RecentDonor[]>([]);
 
+  useEffect(() => {
+    setIsLoading(true);
+    setError(null);
+    Promise.allSettled([
+      campaigns.get(campaignId),
+      churches.list(),
+      donations.list(),
+    ])
+      .then(([campaignResult, churchesResult, donationsResult]) => {
+        if (campaignResult.status === "fulfilled") {
+          setCampaign(campaignResult.value);
+        } else {
+          setError(campaignResult.reason?.message || "Failed to load campaign");
+        }
+        if (churchesResult.status === "fulfilled") {
+          setChurchList(churchesResult.value);
+        } else {
+          setError(churchesResult.reason?.message || "Failed to load churches");
+        }
+        if (donationsResult.status === "fulfilled") {
+          const mappedRecentDonors = donationsResult.value
+            .filter((donation) => donation.campaign_id === campaignId)
+            .sort(
+              (a, b) =>
+                new Date(b.created_at).getTime() -
+                new Date(a.created_at).getTime(),
+            )
+            .slice(0, 8)
+            .map((donation) => ({
+              id: donation.id,
+              userName: donation.is_anonymous
+                ? undefined
+                : `Donor ${donation.user_id.slice(0, 6)}`,
+              amount: donation.amount,
+              date: donation.created_at,
+              anonymous: donation.is_anonymous,
+            }));
+          setRecentDonors(mappedRecentDonors);
+        }
+      })
+      .catch((err) => {
+        setError(err.message || "Failed to load data");
+      })
+      .finally(() => setIsLoading(false));
+  }, [campaignId]);
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-[var(--color-surface)] flex">
+        <Sidebar />
+        <main className="flex-1 ml-72 p-8 flex items-center justify-center">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-[var(--color-primary)] mx-auto mb-4" />
+            <h1 className="font-display text-xl font-semibold text-[var(--color-text)] mb-2">
+              Loading campaign...
+            </h1>
+          </div>
+        </main>
+      </div>
+    );
+  }
+  if (error) {
+    return (
+      <div className="min-h-screen bg-[var(--color-surface)] flex">
+        <Sidebar />
+        <main className="flex-1 ml-72 p-8 flex items-center justify-center">
+          <div className="text-center">
+            <h1 className="font-display text-2xl font-semibold text-[var(--color-text)] mb-4">
+              Error
+            </h1>
+            <p className="text-[var(--color-text-muted)]">{error}</p>
+          </div>
+        </main>
+      </div>
+    );
+  }
   if (!campaign) {
     return (
       <div className="min-h-screen bg-[var(--color-surface)] flex">
@@ -41,15 +139,49 @@ const CampaignDetailPage: React.FC = () => {
   }
 
   const quickAmounts = [100, 500, 1000, 2500];
-  const percentage = (campaign.raisedAmount / campaign.goalAmount) * 100;
+  const raisedAmount = campaign.current_amount ?? 0;
+  const goalAmount = campaign.goal_amount ?? 0;
+  const churchLabel = campaign.church?.name || "Church";
+  const donorCount = campaign.donation_count ?? 0;
+  const daysLeft = campaign.end_date
+    ? Math.max(
+        0,
+        Math.ceil(
+          (new Date(campaign.end_date).getTime() - Date.now()) /
+            (1000 * 60 * 60 * 24),
+        ),
+      )
+    : 0;
+  const percentage = goalAmount > 0 ? (raisedAmount / goalAmount) * 100 : 0;
 
-  const handleDonate = () => {
-    const amount = selectedAmount || parseInt(customAmount) || 0;
-    if (amount > 0) {
-      // Mock donation process
-      alert(`Thank you for your donation of ETB ${amount.toLocaleString()}!`);
-    } else {
-      alert("Please select or enter a donation amount.");
+  const handleDonate = async () => {
+    const donateAmount = selectedAmount || parseInt(customAmount) || 0;
+    if (donateAmount <= 0) {
+      setDonationError("Please enter a donation amount");
+      return;
+    }
+    setIsSubmitting(true);
+    setDonationError(null);
+    try {
+      await donations.create({
+        campaign_id: campaignId,
+        amount: donateAmount,
+        payment_method: paymentMethod,
+        is_anonymous: donateAnonymously,
+      });
+      setSuccess(true);
+      setTimeout(() => setSuccess(false), 3000);
+      // Refresh campaign data
+      const updatedCampaign = await campaigns.get(campaignId);
+      setCampaign(updatedCampaign);
+      setSelectedAmount(null);
+      setCustomAmount("");
+      setPaymentMethod("telebirr");
+      setDonateAnonymously(false);
+    } catch (err: any) {
+      setDonationError(err.message || "Failed to submit donation");
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -88,7 +220,7 @@ const CampaignDetailPage: React.FC = () => {
                 <div className="p-6">
                   <div className="mb-4">
                     <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-[var(--color-surface-2)] text-[var(--color-text-muted)]">
-                      {campaign.church}
+                      {churchLabel}
                     </span>
                   </div>
 
@@ -103,16 +235,16 @@ const CampaignDetailPage: React.FC = () => {
                   {/* Progress Bar */}
                   <div className="mb-6">
                     <ProgressBar
-                      value={campaign.raisedAmount}
-                      max={campaign.goalAmount}
+                      value={raisedAmount}
+                      max={goalAmount}
                       size="lg"
                     />
                     <div className="flex justify-between mt-3">
                       <span className="font-mono text-xl font-bold text-[var(--color-text)]">
-                        ETB {campaign.raisedAmount.toLocaleString()}
+                        ETB {raisedAmount.toLocaleString()}
                       </span>
                       <span className="text-[var(--color-text-muted)]">
-                        of ETB {campaign.goalAmount.toLocaleString()} goal
+                        of ETB {goalAmount.toLocaleString()} goal
                       </span>
                     </div>
                   </div>
@@ -121,13 +253,13 @@ const CampaignDetailPage: React.FC = () => {
                   <div className="flex items-center justify-between text-[var(--color-text-muted)] mb-6">
                     <div className="flex items-center gap-2">
                       <Users className="w-5 h-5" />
-                      <span>{campaign.donorCount} donors</span>
+                      <span>{donorCount} donors</span>
                     </div>
                     <div className="flex items-center gap-2">
                       <Calendar className="w-5 h-5" />
                       <span>
-                        {campaign.daysLeft > 0
-                          ? `${campaign.daysLeft} days left`
+                        {daysLeft > 0
+                          ? `${daysLeft} days left`
                           : "Campaign ended"}
                       </span>
                     </div>
@@ -156,7 +288,7 @@ const CampaignDetailPage: React.FC = () => {
                             ? "👤"
                             : donation.userName
                                 ?.split(" ")
-                                .map((n) => n[0])
+                                .map((n: string) => n[0])
                                 .join("")
                                 .toUpperCase()}
                         </div>
@@ -230,27 +362,33 @@ const CampaignDetailPage: React.FC = () => {
                     Payment Method
                   </label>
                   <div className="space-y-2">
-                    {(["Telebirr", "CBE Birr", "Cash"] as const).map(
-                      (method) => (
-                        <label
-                          key={method}
-                          className="flex items-center gap-3 p-3 rounded-lg border border-[var(--color-border)] hover:bg-[var(--color-surface)] cursor-pointer">
-                          <input
-                            type="radio"
-                            name="paymentMethod"
-                            value={method}
-                            checked={paymentMethod === method}
-                            onChange={(e) =>
-                              setPaymentMethod(e.target.value as any)
-                            }
-                            className="text-[var(--color-accent)] focus:ring-[var(--color-accent)]"
-                          />
-                          <span className="font-body text-[var(--color-text)]">
-                            {method}
-                          </span>
-                        </label>
-                      ),
-                    )}
+                    {(
+                      [
+                        { value: "telebirr", label: "Telebirr" },
+                        { value: "cbe_birr", label: "CBE Birr" },
+                        { value: "cash", label: "Cash" },
+                      ] as const
+                    ).map((method) => (
+                      <label
+                        key={method.value}
+                        className="flex items-center gap-3 p-3 rounded-lg border border-[var(--color-border)] hover:bg-[var(--color-surface)] cursor-pointer">
+                        <input
+                          type="radio"
+                          name="paymentMethod"
+                          value={method.value}
+                          checked={paymentMethod === method.value}
+                          onChange={(e) =>
+                            setPaymentMethod(
+                              e.target.value as typeof paymentMethod,
+                            )
+                          }
+                          className="text-[var(--color-accent)] focus:ring-[var(--color-accent)]"
+                        />
+                        <span className="font-body text-[var(--color-text)]">
+                          {method.label}
+                        </span>
+                      </label>
+                    ))}
                   </div>
                 </div>
 
@@ -274,8 +412,13 @@ const CampaignDetailPage: React.FC = () => {
                   onClick={handleDonate}
                   className="w-full mb-4"
                   size="lg"
-                  disabled={campaign.status !== "active"}>
-                  {campaign.status === "active" ? (
+                  disabled={campaign.status !== "active" || isSubmitting}>
+                  {isSubmitting ? (
+                    <span className="flex items-center justify-center">
+                      <span className="animate-spin rounded-full h-5 w-5 border-t-2 border-b-2 border-white mr-2" />
+                      Submitting...
+                    </span>
+                  ) : campaign.status === "active" ? (
                     <>
                       <Heart className="w-4 h-4 mr-2" />
                       Donate Now
@@ -284,6 +427,17 @@ const CampaignDetailPage: React.FC = () => {
                     "Campaign Ended"
                   )}
                 </Button>
+                {donationError && (
+                  <p className="text-sm text-red-500 text-center mb-2">
+                    {donationError}
+                  </p>
+                )}
+                {success && (
+                  <p className="text-sm text-green-600 text-center mb-2">
+                    Thank you for your donation! Your contribution has been
+                    recorded.
+                  </p>
+                )}
 
                 {/* Security Note */}
                 <p className="text-xs text-[var(--color-text-muted)] text-center">

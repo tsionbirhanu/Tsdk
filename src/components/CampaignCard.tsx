@@ -19,7 +19,25 @@ const CampaignCard: React.FC<CampaignCardProps> = ({
   className,
   compact = false,
 }) => {
-  const percentage = (campaign.raisedAmount / campaign.goalAmount) * 100;
+  const raisedAmount = campaign.raisedAmount ?? campaign.current_amount ?? 0;
+  const goalAmount = campaign.goalAmount ?? campaign.goal_amount ?? 0;
+  const donorCount = campaign.donorCount ?? campaign.donation_count ?? 0;
+  const churchLabel =
+    typeof campaign.church === "string"
+      ? campaign.church
+      : campaign.church?.name || "Church";
+  const daysLeft =
+    campaign.daysLeft ??
+    (campaign.end_date
+      ? Math.max(
+          0,
+          Math.ceil(
+            (new Date(campaign.end_date).getTime() - Date.now()) /
+              (1000 * 60 * 60 * 24),
+          ),
+        )
+      : 0);
+  const percentage = goalAmount > 0 ? (raisedAmount / goalAmount) * 100 : 0;
 
   return (
     <div
@@ -52,7 +70,7 @@ const CampaignCard: React.FC<CampaignCardProps> = ({
         {/* Church Badge */}
         <div className="mb-3">
           <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-[var(--color-surface-2)] text-[var(--color-text-muted)]">
-            {campaign.church}
+            {churchLabel}
           </span>
         </div>
 
@@ -70,17 +88,13 @@ const CampaignCard: React.FC<CampaignCardProps> = ({
 
         {/* Progress */}
         <div className="mb-4">
-          <ProgressBar
-            value={campaign.raisedAmount}
-            max={campaign.goalAmount}
-            size="md"
-          />
+          <ProgressBar value={raisedAmount} max={goalAmount} size="md" />
           <div className="flex justify-between mt-2 text-sm">
             <span className="font-mono font-semibold text-[var(--color-text)]">
-              ETB {campaign.raisedAmount.toLocaleString()}
+              ETB {raisedAmount.toLocaleString()}
             </span>
             <span className="text-[var(--color-text-muted)]">
-              of ETB {campaign.goalAmount.toLocaleString()}
+              of ETB {goalAmount.toLocaleString()}
             </span>
           </div>
         </div>
@@ -89,15 +103,11 @@ const CampaignCard: React.FC<CampaignCardProps> = ({
         <div className="flex items-center justify-between mb-6 text-sm text-[var(--color-text-muted)]">
           <div className="flex items-center gap-1">
             <Users className="w-4 h-4" />
-            <span>{campaign.donorCount} donors</span>
+            <span>{donorCount} donors</span>
           </div>
           <div className="flex items-center gap-1">
             <Calendar className="w-4 h-4" />
-            <span>
-              {campaign.daysLeft > 0
-                ? `${campaign.daysLeft} days left`
-                : "Ended"}
-            </span>
+            <span>{daysLeft > 0 ? `${daysLeft} days left` : "Ended"}</span>
           </div>
         </div>
 

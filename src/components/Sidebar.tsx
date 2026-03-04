@@ -18,8 +18,7 @@ import {
   Settings,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { getCurrentUser } from "@/lib/mock-data";
-import { useAuth } from "@/contexts/AuthContext";
+import { useAuth } from "@/lib/api/auth-context";
 
 interface SidebarProps {
   isAdmin?: boolean;
@@ -27,8 +26,7 @@ interface SidebarProps {
 
 const Sidebar: React.FC<SidebarProps> = ({ isAdmin = false }) => {
   const pathname = usePathname();
-  const { logout } = useAuth();
-  const currentUser = getCurrentUser();
+  const { logout, user } = useAuth();
 
   const memberNavItems = [
     { icon: LayoutDashboard, label: "Dashboard", href: "/dashboard" },
@@ -104,21 +102,33 @@ const Sidebar: React.FC<SidebarProps> = ({ isAdmin = false }) => {
       <div className="p-4 border-t border-[var(--color-primary-light)]">
         {/* User Info */}
         <div className="flex items-center gap-3 mb-4 px-2">
-          <div className="w-10 h-10 rounded-full bg-[var(--color-accent)] text-[var(--color-primary)] flex items-center justify-center font-display font-bold">
-            {currentUser.name
-              .split(" ")
-              .map((n) => n[0])
-              .join("")
-              .toUpperCase()}
-          </div>
-          <div className="flex-1 min-w-0">
-            <p className="font-body font-semibold text-white truncate">
-              {currentUser.name}
-            </p>
-            <p className="text-xs text-white/70 truncate">
-              {currentUser.homeChurch}
-            </p>
-          </div>
+          {user ? (
+            <>
+              <div className="w-10 h-10 rounded-full bg-[var(--color-accent)] text-[var(--color-primary)] flex items-center justify-center font-display font-bold">
+                {user.full_name
+                  .split(" ")
+                  .map((n) => n[0])
+                  .join("")
+                  .toUpperCase()}
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="font-body font-semibold text-white truncate">
+                  {user.full_name}
+                </p>
+                <p className="text-xs text-white/70 truncate capitalize">
+                  {user.role}
+                </p>
+              </div>
+            </>
+          ) : (
+            <>
+              <div className="w-10 h-10 rounded-full bg-gray-400 animate-pulse" />
+              <div className="flex-1 space-y-1">
+                <div className="h-4 bg-gray-400 rounded animate-pulse" />
+                <div className="h-3 bg-gray-400 rounded w-3/4 animate-pulse" />
+              </div>
+            </>
+          )}
         </div>
 
         {/* Logout Button */}

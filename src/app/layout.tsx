@@ -1,6 +1,6 @@
 import { Playfair_Display, DM_Sans, DM_Mono } from "next/font/google";
 import "./globals.css";
-import AuthProvider from "@/contexts/AuthContext";
+import { AuthProvider } from "@/lib/api/auth-context";
 
 const playfairDisplay = Playfair_Display({
   weight: ["400", "700"],
